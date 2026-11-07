@@ -1,5 +1,5 @@
 
-# Hybrid Intrusion Detection System (IDPS) + Attack Simulation Platform
+# CANSHIELD: Intra-Vechicle Intrution Detection and Prevention system
 
 ## Overview
 
