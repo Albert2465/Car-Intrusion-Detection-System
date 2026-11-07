@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced IDPS Dashboard - Light Mode</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        @keyframes pulse-alert {
+
+            0%,
+            100% {
+                opacity: 1;
+                background-color: rgba(239, 68, 68, 0.05);
+            }
+
+            50% {
+                opacity: 0.8;
+                background-color: rgba(239, 68, 68, 0.15);
+            }
+        }
+
+        .alert-new {
+            animation: pulse-alert 2s ease-in-out;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        .modal {
+            display: none;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        /* Custom scrollbar for a clean light look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-900">
+    <div class="min-h-screen p-6">
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-blue-600 rounded-xl shadow-lg shadow-blue-200">
+                    <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                        </path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-black text-slate-800 tracking-tight">CIDPS Dashboard</h1>
+                    <p class="text-slate-500 text-sm font-medium">ML + Rules + Manual Blocking</p>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="showRuleBuilder()"
+                    class="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-lg shadow-indigo-100">
+                    ➕ Add Rule
+                </button>
+
+
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <p class="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Packets</p>
+                <p id="totalPackets" class="text-4xl font-black mt-2 text-slate-800">0</p>
+            </div>
+
+            <div class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 shadow-sm">
+                <p class="text-emerald-700 text-xs font-bold uppercase tracking-wider">Benign Traffic</p>
+                <p id="benignCount" class="text-4xl font-black mt-2 text-emerald-600">0</p>
+            </div>
+
+            <div class="bg-red-50 rounded-2xl p-6 border border-red-100 shadow-sm">
+                <p class="text-red-700 text-xs font-bold uppercase tracking-wider">Attacks Detected</p>
+                <p id="attackCount" class="text-4xl font-black mt-2 text-red-600">0</p>
+                <div class="flex gap-2 text-[10px] font-bold mt-2 text-red-400">
+                    <span>ML: <span id="mlCount">0</span></span>
+                    <span>RULES: <span id="ruleCount">0</span></span>
+                    <span>ML: <span id="heuristicCount">0</span></span>
+                </div>
+            </div>
+
+            <div class="bg-orange-50 rounded-2xl p-6 border border-orange-100 shadow-sm">
+                <p class="text-orange-700 text-xs font-bold uppercase tracking-wider">IPs Blocked</p>
+                <p id="blockedCount" class="text-4xl font-black mt-2 text-orange-600">0</p>
+            </div>
+
+            <div id="threatCard"
+                class="bg-emerald-50 rounded-2xl p-6 border border-emerald-100 shadow-sm transition-all duration-500">
+                <p class="text-emerald-700 text-xs font-bold uppercase tracking-wider">Threat Level</p>
+                <p id="threatLevel" class="text-4xl font-black mt-2 text-emerald-600 uppercase">Low</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <h2 class="text-lg font-black mb-6 text-slate-800 flex items-center gap-2">
+                    <span class="p-1.5 bg-blue-50 rounded-lg text-blue-600">📊</span> Attack Distribution
+                </h2>
+                <div id="distributionContainer" class="space-y-4"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <span class="p-1.5 bg-red-50 rounded-lg text-red-600">🚨</span> Recent Alerts
+                    </h2>
+                    <span id="alertBadge"
+                        class="text-xs bg-red-100 text-red-600 font-bold px-2 py-1 rounded-lg">0</span>
+                </div>
+                <div id="alertsContainer" class="space-y-3 max-h-96 overflow-y-auto pr-2"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <span class="p-1.5 bg-orange-50 rounded-lg text-orange-600">🚫</span> Blocked IPs
+                    </h2>
+                    <span id="blockBadge"
+                        class="text-xs bg-slate-100 text-slate-500 font-bold px-2 py-1 rounded-lg">0</span>
+                </div>
+                <div id="blockedIPsContainer" class="space-y-3 max-h-96 overflow-y-auto pr-2"></div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
+            <h2 class="text-lg font-black mb-6 text-slate-800 flex items-center gap-2">
+                <span class="p-1.5 bg-indigo-50 rounded-lg text-indigo-600">📋</span> Active Blocking Rules
+            </h2>
+            <div id="rulesContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mt-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <span class="p-1.5 bg-purple-50 rounded-lg text-purple-600">🔬</span> Forensic Analysis
+                </h2>
+                <div class="flex gap-2">
+                    <button onclick="exportForensicData('csv')"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition">
+                        📥 Export CSV
+                    </button>
+                    <button onclick="exportForensicData('json')"
+                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition">
+                        📥 Export JSON
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-4 flex gap-2">
+                <select id="forensicFilter" onchange="loadForensicPackets()"
+                    class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold">
+                    <option value="all">All Packets</option>
+                    <option value="attacks">Attacks Only</option>
+                    <option value="benign">Benign Only</option>
+                </select>
+            </div>
+
+            <div id="forensicContainer" class="space-y-2 max-h-96 overflow-y-auto"></div>
+        </div>
+
+    </div>
+
+    <div id="ruleModal" class="modal fixed inset-0 bg-slate-900/40 backdrop-blur-sm items-center justify-center z-50">
+        <div class="bg-white rounded-3xl p-8 max-w-xl w-full mx-4 border border-slate-200 shadow-2xl">
+            <h2 class="text-2xl font-black mb-6 text-slate-800">Create Blocking Rule</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rule Name</label>
+                    <input id="ruleName" type="text"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        placeholder="e.g., Block SSH Attacks">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rule Type</label>
+                        <select id="ruleType"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                            <option value="ip_exact">Exact IP Address</option>
+                            <option value="ip_range">IP Range (CIDR)</option>
+                            <option value="port">Specific Port</option>
+                            <option value="port_range">Port Range</option>
+                            <option value="protocol">Protocol</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Rule Value</label>
+                        <input id="ruleValue" type="text"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                            placeholder="e.g., 192.168.1.1">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Description</label>
+                    <textarea id="ruleDescription" rows="3"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                        placeholder="Reason for blocking..."></textarea>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-8">
+                <button onclick="createRule()"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition shadow-lg shadow-blue-100">
+                    Create Rule
+                </button>
+                <button onclick="hideRuleBuilder()"
+                    class="px-6 py-3 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl font-bold transition">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="packetModal" class="modal fixed inset-0 bg-slate-900/40 backdrop-blur-sm items-center justify-center z-50">
+        <div
+            class="bg-white rounded-3xl p-8 max-w-4xl w-full mx-4 border border-slate-200 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-6">
+                <h2 class="text-2xl font-black text-slate-800">Packet Dissection</h2>
+                <button onclick="hidePacketModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <div id="packetDetailsContainer" class="space-y-4"></div>
+
+            <button onclick="hidePacketModal()"
+                class="mt-6 w-full bg-slate-100 text-slate-600 hover:bg-slate-200 px-6 py-3 rounded-xl font-bold transition">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* [Logic and Socket implementation remain functionally identical to your dark theme original] */
+        const socket = io('http://localhost:5000');
+        let monitoring = false;
+        let alertCount = 0;
+
+        socket.on('connect', () => console.log('✓ Connected'));
+        socket.on('new_alert', (alert) => { addAlert(alert); alertCount++; document.getElementById('alertBadge').textContent = alertCount; });
+        socket.on('stats_update', (data) => { updateStats(data.stats); updateDistribution(data.distribution); });
+        socket.on('ip_blocked', () => loadStatus());
+        socket.on('ip_unblocked', () => loadStatus());
+
+        function showRuleBuilder() { document.getElementById('ruleModal').classList.add('active'); }
+        function hideRuleBuilder() { document.getElementById('ruleModal').classList.remove('active'); }
+
+        async function createRule() {
+            const data = {
+                rule_name: document.getElementById('ruleName').value,
+                rule_type: document.getElementById('ruleType').value,
+                rule_value: document.getElementById('ruleValue').value,
+                description: document.getElementById('ruleDescription').value
+            };
+            if (!data.rule_name || !data.rule_value) { alert('Required fields missing'); return; }
+            const response = await fetch('/api/rules', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (result.success) { hideRuleBuilder(); loadRules(); }
+        }
+
+        async function loadRules() {
+            const response = await fetch('/api/rules');
+            const rules = await response.json();
+            const container = document.getElementById('rulesContainer');
+            if (rules.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-4 col-span-2">No rules defined.</p>';
+                return;
+            }
+            container.innerHTML = rules.map(rule => `
+                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 border-l-4 ${rule.enabled ? 'border-l-indigo-500' : 'border-l-slate-300'}">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="font-bold text-slate-800">${rule.name}</h3>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${rule.enabled ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500'}">
+                                    ${rule.enabled ? 'Active' : 'Disabled'}
+                                </span>
+                            </div>
+                            <p class="text-xs text-slate-500 font-mono">${rule.type}: ${rule.value}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="toggleRule(${rule.id}, ${!rule.enabled})" class="p-2 bg-white border border-slate-200 rounded-lg hover:bg-white shadow-sm transition">
+                                ${rule.enabled ? '⏸' : '▶'}
+                            </button>
+                            <button onclick="deleteRule(${rule.id})" class="p-2 bg-red-50 border border-red-100 text-red-600 rounded-lg hover:bg-red-100 transition">
+                                🗑
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function toggleRule(ruleId, enable) {
+            await fetch(`/api/rules/${ruleId}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ enable })
+            });
+            loadRules();
+        }
+
+        async function deleteRule(ruleId) {
+            if (!confirm('Delete rule?')) return;
+            await fetch(`/api/rules/${ruleId}`, { method: 'DELETE' });
+            loadRules();
+        }
+
+        async function toggleMonitoring() {
+            const btn = document.getElementById('startBtn');
+            const icon = document.getElementById('btnIcon');
+            const text = document.getElementById('btnText');
+            if (!monitoring) {
+                const response = await fetch('/api/start', { method: 'POST' });
+                if ((await response.json()).success) {
+                    monitoring = true;
+                    btn.className = 'flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition shadow-lg';
+                    icon.textContent = '⏹'; text.textContent = 'Stop';
+                }
+            } else {
+                const response = await fetch('/api/stop', { method: 'POST' });
+                if ((await response.json()).success) {
+                    monitoring = false;
+                    btn.className = 'flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition shadow-lg';
+                    icon.textContent = '▶'; text.textContent = 'Start';
+                }
+            }
+        }
+
+        async function resetStats() {
+            if (!confirm('Reset statistics?')) return;
+            await fetch('/api/reset', { method: 'POST' });
+            loadStatus();
+        }
+
+        function updateStats(stats) {
+            document.getElementById('totalPackets').textContent = stats.total_packets;
+            document.getElementById('benignCount').textContent = stats.benign;
+            document.getElementById('attackCount').textContent = stats.attacks;
+            document.getElementById('mlCount').textContent = stats.ml_detections || 0;
+            document.getElementById('ruleCount').textContent = stats.rule_detections || 0;
+            document.getElementById('heuristicCount').textContent = stats.heuristic_detections || 0;
+            document.getElementById('blockedCount').textContent = stats.blocked_ips;
+            document.getElementById('blockBadge').textContent = stats.blocked_ips;
+
+            const threatLevel = document.getElementById('threatLevel');
+            const threatCard = document.getElementById('threatCard');
+            threatLevel.textContent = stats.threat_level;
+
+            if (stats.threat_level === 'High') {
+                threatCard.className = 'bg-red-50 rounded-2xl p-6 border border-red-200 shadow-sm';
+                threatLevel.className = 'text-4xl font-black mt-2 text-red-600';
+            } else if (stats.threat_level === 'Medium') {
+                threatCard.className = 'bg-orange-50 rounded-2xl p-6 border border-orange-200 shadow-sm';
+                threatLevel.className = 'text-4xl font-black mt-2 text-orange-600';
+            } else {
+                threatCard.className = 'bg-emerald-50 rounded-2xl p-6 border border-emerald-200 shadow-sm';
+                threatLevel.className = 'text-4xl font-black mt-2 text-emerald-600';
+            }
+        }
+
+        function updateDistribution(distribution) {
+            const container = document.getElementById('distributionContainer');
+            const total = Object.values(distribution).reduce((a, b) => a + b, 0);
+            if (total === 0) return;
+            const sorted = Object.entries(distribution).sort((a, b) => b[1] - a[1]);
+            container.innerHTML = sorted.map(([type, count]) => {
+                const percentage = ((count / total) * 100).toFixed(1);
+                const color = type === 'Benign' ? 'emerald' : 'red';
+                return `
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                        <div class="flex justify-between text-xs font-bold mb-2 uppercase">
+                            <span class="text-${color}-600">${type}</span>
+                            <span class="text-slate-400">${count} (${percentage}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-200 rounded-full h-2">
+                            <div class="h-2 rounded-full bg-${color}-500" style="width: ${percentage}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addAlert(alert) {
+            const container = document.getElementById('alertsContainer');
+            if (container.querySelector('.text-center')) container.innerHTML = '';
+            const methodBadge = {
+                'ml': '<span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-[10px] font-bold rounded">ML</span>',
+                'rule': '<span class="px-2 py-0.5 bg-purple-100 text-purple-600 text-[10px] font-bold rounded">RULE</span>',
+                'heuristic': '<span class="px-2 py-0.5 bg-cyan-100 text-cyan-600 text-[10px] font-bold rounded">HEUR</span>',
+                'external': '<span class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded animate-pulse">EXTERNAL</span>'
+            };
+            const alertHTML = `
+                <div class="bg-white rounded-xl p-4 border border-slate-200 border-l-4 ${alert.is_external ? 'border-l-red-600 ring-2 ring-red-500/20' : 'border-l-red-500'} alert-new shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-bold text-red-600 text-sm">${alert.type}</span>
+                                ${methodBadge[alert.detectionMethod] || ''}
+                            </div>
+                            <p class="text-xs text-slate-500 font-mono">Src: ${alert.srcIP}</p>
+                            <p class="text-[10px] text-slate-400">Conf: ${(alert.confidence * 100).toFixed(1)}%</p>
+                        </div>
+                        <div class="flex flex-col gap-2 items-end">
+                            <span class="text-[10px] text-slate-400 font-bold">${alert.timestamp}</span>
+                            ${alert.canBlock && !alert.blocked ? `
+                                <button onclick="blockIP('${alert.srcIP}', '${alert.type}')" 
+                                        class="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-bold hover:bg-red-700 transition">
+                                    Block
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('afterbegin', alertHTML);
+            if (container.children.length > 15) container.removeChild(container.lastChild);
+        }
+
+        async function blockIP(ip, attackType) {
+            if (!confirm(`Block ${ip}?`)) return;
+            const response = await fetch(`/api/block/${ip}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ attack_type: attackType })
+            });
+            if ((await response.json()).success) loadStatus();
+        }
+
+        async function unblockIP(ip) {
+            if (!confirm(`Unblock IP ${ip}?`)) return;
+            const response = await fetch(`/api/unblock/${ip}`, { method: 'POST' });
+            const data = await response.json();
+            if (data.success) {
+                loadStatus(); // Refresh the list immediately
+            }
+        }
+
+        async function loadStatus() {
+            const response = await fetch('/api/status');
+            const data = await response.json();
+
+            updateStats(data.stats);
+            updateDistribution(data.distribution);
+
+            const blockedContainer = document.getElementById('blockedIPsContainer');
+            if (data.blocked_ips && data.blocked_ips.length > 0) {
+                blockedContainer.innerHTML = data.blocked_ips.map(ip => `
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 border-l-4 border-l-orange-500 mb-3 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-bold text-orange-600 font-mono text-sm">${ip.address}</p>
+                                <p class="text-[10px] text-slate-500 font-bold uppercase mt-1">Reason: ${ip.attackType}</p>
+                                <p class="text-[10px] text-slate-400 mt-0.5">${ip.blockedAt || ''}</p>
+                            </div>
+                            <button onclick="unblockIP('${ip.address}')" class="text-xs font-bold text-red-600 hover:text-red-700 transition">
+                                Unblock
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                blockedContainer.innerHTML = '<p class="text-slate-400 text-center py-4">No IPs blocked</p>';
+            }
+        }
+
+
+        // Forensic Functions
+        async function loadForensicPackets() {
+            const filter = document.getElementById('forensicFilter').value;
+            const response = await fetch(`/api/forensics/packets?filter=${filter}&limit=50`);
+            const packets = await response.json();
+
+            const container = document.getElementById('forensicContainer');
+            if (packets.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-center py-4">No packets captured yet</p>';
+                return;
+            }
+
+            container.innerHTML = packets.map(packet => `
+                <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 hover:border-slate-300 cursor-pointer transition"
+                    onclick="showPacketDetails(${packet.packet_id})">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center gap-4 flex-1">
+                            <span class="px-2 py-1 rounded-lg text-xs font-bold ${packet.is_attack ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}">
+                                ${packet.predicted_type}
+                            </span>
+                            <span class="text-xs font-mono text-slate-600">${packet.src_ip} → ${packet.dst_ip}</span>
+                            <span class="text-xs text-slate-400">Port: ${packet.dst_port}</span>
+                            <span class="text-xs text-slate-400">${packet.timestamp}</span>
+                        </div>
+                        <span class="text-xs font-bold text-blue-600">View Details →</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function showPacketDetails(packetId) {
+            const response = await fetch(`/api/forensics/packet/${packetId}`);
+            const packet = await response.json();
+
+            document.getElementById('packetDetailsContainer').innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-50 rounded-xl p-4">
+                        <h3 class="font-bold text-slate-700 mb-2">Network Layer</h3>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="font-mono text-slate-500">Source IP:</span> ${packet.src_ip}</p>
+                            <p><span class="font-mono text-slate-500">Dest IP:</span> ${packet.dst_ip}</p>
+                            <p><span class="font-mono text-slate-500">Protocol:</span> ${packet.protocol}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-50 rounded-xl p-4">
+                        <h3 class="font-bold text-slate-700 mb-2">Transport Layer</h3>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="font-mono text-slate-500">Source Port:</span> ${packet.src_port}</p>
+                            <p><span class="font-mono text-slate-500">Dest Port:</span> ${packet.dst_port}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-red-50 rounded-xl p-4">
+                        <h3 class="font-bold text-red-700 mb-2">Detection Results</h3>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="font-mono text-slate-500">Predicted:</span> <span class="font-bold">${packet.predicted_type}</span></p>
+                            <p><span class="font-mono text-slate-500">Confidence:</span> ${(packet.confidence * 100).toFixed(2)}%</p>
+                            <p><span class="font-mono text-slate-500">Severity:</span> ${packet.severity}</p>
+                            <p><span class="font-mono text-slate-500">Method:</span> ${packet.detection_method}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-50 rounded-xl p-4">
+                        <h3 class="font-bold text-slate-700 mb-2">Metadata</h3>
+                        <div class="space-y-1 text-sm">
+                            <p><span class="font-mono text-slate-500">Packet ID:</span> ${packet.packet_id}</p>
+                            <p><span class="font-mono text-slate-500">Timestamp:</span> ${packet.timestamp}</p>
+                            <p><span class="font-mono text-slate-500">True Label:</span> ${packet.label}</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-xl p-4">
+                    <h3 class="font-bold text-blue-700 mb-2">Feature Vector (Top 10)</h3>
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+                        ${Object.entries(packet.features).slice(0, 10).map(([key, value]) => `
+                            <div class="bg-white rounded p-2">
+                                <span class="text-slate-500">${key}:</span> 
+                                <span class="text-slate-800">${typeof value === 'number' ? value.toFixed(4) : value}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('packetModal').classList.add('active');
+        }
+
+        function hidePacketModal() {
+            document.getElementById('packetModal').classList.remove('active');
+        }
+
+        async function exportForensicData(format) {
+            const filter = document.getElementById('forensicFilter').value;
+            const response = await fetch('/api/forensics/export', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ format, filter })
+            });
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `forensic_data_${Date.now()}.${format}`;
+            a.click();
+        }
+
+        // Add to initialization
+        loadForensicPackets();
+        loadStatus();
+        loadRules();
+        setInterval(loadForensicPackets, 5000);
+        setInterval(loadStatus, 5000);
+        setInterval(loadRules, 10000);
+    </script>
+</body>
+
+</html>

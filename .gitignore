@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Local secrets and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Python tooling and build artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+
+# Generated traffic and data exports
+generated_traffic.csv
+enhanced_traffic.csv
+selected_data_export.csv
+
+# Operating system files
+.DS_Store
+Thumbs.db

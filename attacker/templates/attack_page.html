@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ attack.name }} - Predator System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+
+        body {
+            font-family: 'JetBrains+Mono', monospace;
+            background-color: #050505;
+            color: #ef4444;
+        }
+
+        .glass {
+            background: rgba(15, 15, 15, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .neon-border {
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.1);
+        }
+
+        .scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .scrollbar::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        .scrollbar::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
+        }
+
+        .scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #ef4444;
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex">
+    <!-- Sidebar -->
+    <div class="w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col">
+        <div class="p-6 border-b border-zinc-900">
+            <h1 class="text-xl font-black tracking-tighter text-white">PREDATOR <span class="text-red-600">v1</span>
+            </h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto scrollbar">
+            <a href="/"
+                class="block p-3 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-zinc-900 transition-all">Dashboard</a>
+            <div class="pt-4 pb-2 text-[10px] font-bold text-zinc-700 uppercase tracking-widest px-3">Available Modules
+            </div>
+            {% for key, a in attacks.items() %}
+            <a href="/attack/{{ key }}"
+                class="block p-3 rounded-lg text-xs font-bold uppercase tracking-widest {% if key == attack_key %}bg-red-900/20 text-red-500 border border-red-900/30{% else %}text-zinc-400 hover:text-white hover:bg-zinc-900{% endif %} transition-all">
+                {{ a.name }}
+            </a>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-zinc-900 bg-zinc-950/50 flex items-center justify-between px-8">
+            <div class="flex items-center gap-3">
+                <span class="w-2 h-2 rounded-full" id="statusDot"></span>
+                <h2 class="text-sm font-bold uppercase tracking-widest text-white">{{ attack.name }} <span
+                        class="text-zinc-600 ml-2">/ Offensive Module</span></h2>
+            </div>
+            <div class="flex items-center gap-6">
+                <div class="text-right">
+                    <p class="text-[10px] text-zinc-600 font-bold uppercase">System Status</p>
+                    <p class="text-[11px] text-green-500 font-mono" id="statusText">READY</p>
+                </div>
+                <button onclick="resetStats()"
+                    class="text-[10px] font-bold text-zinc-500 hover:text-white uppercase tracking-widest border border-zinc-800 px-3 py-1 rounded">Reset
+                    Stats</button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 scrollbar">
+            <div class="max-w-6xl mx-auto space-y-8">
+                <!-- Info Section -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-2 space-y-6">
+                        <!-- Configuration -->
+                        <div class="glass p-6 rounded-2xl">
+                            <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-6">Target
+                                Configuration</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div class="space-y-4">
+                                    <!-- <div>
+                                        <label class="text-[10px] text-zinc-600 block mb-1">TARGET URL (DEFENDER INJECT)</label>
+                                        <input type="text" id="targetUrl" value="http://localhost:5000/api/inject" class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-all font-mono">
+                                    </div> -->
+                                    {% if attack_key == 'portscan' %}
+                                    <div class="grid grid-cols-1 gap-4">
+                                        <div>
+                                            <label class="text-[10px] text-zinc-600 block mb-1">TARGET IP</label>
+                                            <input type="text" id="targetIp" value="192.168.1.10"
+                                                class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-all font-mono">
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] text-zinc-600 block mb-1">PORT RANGE (e.g.,
+                                                1-1024)</label>
+                                            <input type="text" id="portRange" value="1-1024"
+                                                class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-all font-mono">
+                                        </div>
+                                    </div>
+                                    {% else %}
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="text-[10px] text-zinc-600 block mb-1">TARGET IP</label>
+                                            <input type="text" id="targetIp" value="192.168.1.10"
+                                                class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-all font-mono">
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] text-zinc-600 block mb-1">TARGET PORT</label>
+                                            <input type="number" id="targetPort" value="80"
+                                                class="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500 transition-all font-mono">
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="space-y-4">
+                                    {% if attack_key != 'portscan' %}
+                                    <div>
+                                        <div class="flex justify-between text-[10px] font-bold uppercase mb-2">
+                                            <span class="text-zinc-600">Attack Intensity</span>
+                                            <span class="text-red-500" id="intensityValue">5 Pkts/Sec</span>
+                                        </div>
+                                        <input type="range" id="intensity" min="1" max="50" value="5"
+                                            oninput="updateIntensity()"
+                                            class="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-red-600">
+                                    </div>
+                                    {% endif %}
+                                    <div class="pt-4">
+                                        <button id="launchBtn" onclick="toggleAttack()"
+                                            class="w-full bg-red-600 hover:bg-red-700 text-white py-3 rounded-lg font-black text-sm tracking-widest transition-all shadow-lg shadow-red-900/20">
+                                            {% if attack_key == 'portscan' %}START DISCOVERY{% else %}LAUNCH MODULE{%
+                                            endif %}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Side Stats -->
+                    <div class="space-y-6">
+                        <div class="glass p-6 rounded-2xl border-l-4 border-l-red-600">
+                            <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">{% if
+                                attack_key == 'portscan' %}Ports Scanned{% else %}Packets Sent{% endif %}</p>
+                            <p id="packetsSent" class="text-4xl font-black text-white">0</p>
+                        </div>
+                        <div class="glass p-6 rounded-2xl border-l-4 border-l-green-600">
+                            <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">{% if
+                                attack_key == 'portscan' %}Open Found{% else %}Bypass Rate{% endif %}</p>
+                            <p id="bypassRate" class="text-4xl font-black text-white">0%</p>
+                        </div>
+                        <div class="glass p-6 rounded-2xl border-l-4 border-l-yellow-600">
+                            <p class="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mb-1">Current PPS
+                            </p>
+                            <p id="currentPPS" class="text-4xl font-black text-white">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Section -->
+                <div class="glass p-6 rounded-2xl">
+                    <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4">Traffic Velocity (PPS)
+                    </h3>
+                    <div class="h-[200px]">
+                        <canvas id="ppsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Log Section -->
+                <div class="glass rounded-2xl overflow-hidden flex flex-col h-[300px]">
+                    <div class="px-6 py-4 border-b border-zinc-900 bg-zinc-900/30 flex justify-between items-center">
+                        <h3
+                            class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> Module Output
+                        </h3>
+                        <span class="text-[9px] font-mono text-zinc-600">CHANNEL: offensive_stream</span>
+                    </div>
+                    <div id="logArea"
+                        class="flex-1 overflow-y-auto p-6 space-y-1 font-mono text-[10px] scroll-smooth scrollbar">
+                        <div class="text-zinc-700">PREDATOR_{{ attack_key.upper() }} initialized...</div>
+                        <div class="text-zinc-700">Waiting for launch command...</div>
+                    </div>
+                </div>
+
+                <!-- Module Description (Moved to Bottom) -->
+                <div class="glass p-8 rounded-2xl neon-border mt-6">
+                    <h3 class="text-sm font-bold text-zinc-500 uppercase tracking-[0.2em] mb-4">Module Description</h3>
+                    <p class="text-zinc-200 text-lg leading-relaxed">{{ attack.desc }}</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:5001');
+        const attackKey = '{{ attack_key }}';
+        const attackName = '{{ attack.id }}';
+        let isAttacking = false;
+
+        // Chart Setup
+        const ctx = document.getElementById('ppsChart').getContext('2d');
+        const ppsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(30).fill(''),
+                datasets: [{
+                    label: 'PPS',
+                    data: Array(30).fill(0),
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true,
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#333', font: { size: 9 } }
+                    }
+                },
+                animation: { duration: 0 }
+            }
+        });
+
+        function updateIntensity() {
+            const val = document.getElementById('intensity').value;
+            document.getElementById('intensityValue').textContent = `${val} Pkts/Sec`;
+        }
+
+        async function toggleAttack() {
+            const launchBtn = document.getElementById('launchBtn');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (!isAttacking) {
+                const targetUrlElem = document.getElementById('targetUrl');
+                const targetUrl = targetUrlElem ? targetUrlElem.value : 'http://localhost:5000/api/inject';
+                const targetIp = document.getElementById('targetIp').value;
+
+                const payload = {
+                    type: attackName,
+                    targetUrl,
+                    targetIp
+                };
+
+                if (attackKey === 'portscan') {
+                    payload.portRange = document.getElementById('portRange').value;
+                } else {
+                    payload.intensity = document.getElementById('intensity').value;
+                    payload.targetPort = document.getElementById('targetPort').value;
+                }
+
+                const response = await fetch('/api/attack/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseData = await response.json();
+                if (responseData.success) {
+                    isAttacking = true;
+                    launchBtn.textContent = attackKey === 'portscan' ? 'ABORT SCAN' : 'STOP MODULE';
+                    launchBtn.classList.replace('bg-red-600', 'bg-zinc-900');
+                    launchBtn.classList.add('border', 'border-red-500', 'text-red-500');
+                    statusDot.classList.replace('bg-zinc-800', 'bg-red-500');
+                    statusDot.classList.add('animate-pulse');
+                    statusText.textContent = attackKey === 'portscan' ? 'SCANNING' : 'EXECUTING';
+                    statusText.classList.replace('text-green-500', 'text-red-500');
+                } else {
+                    const area = document.getElementById('logArea');
+                    const entry = document.createElement('div');
+                    entry.className = 'text-red-400 font-bold';
+                    entry.innerHTML = `[ERROR] ${responseData.message || 'Failed to start module'}. <button onclick="forceStop()" class="text-xs text-white underline ml-2 hover:text-red-500">Force Stop Module</button>`;
+                    area.appendChild(entry);
+                    area.scrollTop = area.scrollHeight;
+                }
+            } else {
+                await fetch('/api/attack/stop', { method: 'POST' });
+                isAttacking = false;
+                launchBtn.textContent = attackKey === 'portscan' ? 'START DISCOVERY' : 'LAUNCH MODULE';
+                launchBtn.classList.replace('bg-zinc-900', 'bg-red-600');
+                launchBtn.classList.remove('border', 'border-red-500', 'text-red-500');
+                statusDot.classList.replace('bg-red-500', 'bg-zinc-800');
+                statusDot.classList.remove('animate-pulse');
+                statusText.textContent = 'READY';
+                statusText.classList.replace('text-red-500', 'text-green-500');
+            }
+        }
+
+        async function forceStop() {
+            await fetch('/api/attack/stop', { method: 'POST' });
+            const area = document.getElementById('logArea');
+            const entry = document.createElement('div');
+            entry.className = 'text-green-400 font-bold';
+            entry.textContent = '[SYSTEM] Forced stop command sent to backend.';
+            area.appendChild(entry);
+            area.scrollTop = area.scrollHeight;
+            isAttacking = false;
+        }
+
+        async function resetStats() {
+            await fetch('/api/stats/reset', { method: 'POST' });
+            // Clear chart data
+            ppsChart.data.datasets[0].data.fill(0);
+            ppsChart.update();
+        }
+
+        socket.on('attack_update', (stats) => {
+            document.getElementById('packetsSent').textContent = stats.sent;
+            document.getElementById('currentPPS').textContent = stats.pps;
+
+            if (attackKey === 'portscan') {
+                const elem = document.getElementById('bypassRate');
+                if (stats.open_ports && stats.open_ports.length > 0) {
+                    elem.textContent = stats.open_ports.join(', ');
+                    elem.style.fontSize = '1.25rem';
+                    elem.style.lineHeight = '1.5';
+                    elem.style.wordBreak = 'break-word';
+                } else {
+                    elem.textContent = stats.detected;
+                    elem.style.fontSize = '';
+                }
+            } else {
+                const bypassed = stats.sent - stats.detected;
+                const bypassRate = stats.sent > 0 ? ((bypassed / stats.sent) * 100).toFixed(1) : 0;
+                document.getElementById('bypassRate').textContent = `${bypassRate}%`;
+            }
+
+            // Update Graph
+            ppsChart.data.datasets[0].data.push(stats.pps);
+            ppsChart.data.datasets[0].data.shift();
+            ppsChart.update();
+        });
+
+        socket.on('attack_log', (log) => {
+            const area = document.getElementById('logArea');
+            const entry = document.createElement('div');
+            if (log.type === 'error') entry.className = 'text-red-400';
+            else if (log.type === 'success') entry.className = 'text-green-400 font-bold';
+            else entry.className = 'text-zinc-600';
+
+            entry.textContent = `[${log.timestamp}] ${log.msg}`;
+            area.appendChild(entry);
+            area.scrollTop = area.scrollHeight;
+        });
+
+        socket.on('scan_complete', () => {
+            isAttacking = false;
+            const launchBtn = document.getElementById('launchBtn');
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            launchBtn.textContent = 'START DISCOVERY';
+            launchBtn.classList.replace('bg-zinc-900', 'bg-red-600');
+            launchBtn.classList.remove('border', 'border-red-500', 'text-red-500');
+            statusDot.classList.replace('bg-red-500', 'bg-zinc-800');
+            statusDot.classList.remove('animate-pulse');
+            statusText.textContent = 'READY';
+            statusText.classList.replace('text-red-500', 'text-green-500');
+
+            const area = document.getElementById('logArea');
+            const entry = document.createElement('div');
+            entry.className = 'text-white border-y border-zinc-900 py-2 my-2 text-center uppercase tracking-widest';
+            entry.textContent = '--- Scan Cycle Exhausted ---';
+            area.appendChild(entry);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Predator System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&display=swap');
+        body { font-family: 'JetBrains+Mono', monospace; background-color: #050505; color: #ef4444; }
+        .glass { background: rgba(15, 15, 15, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .neon-border { border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 15px rgba(239, 68, 68, 0.1); }
+        .scrollbar::-webkit-scrollbar { width: 4px; }
+        .scrollbar::-webkit-scrollbar-track { background: #0a0a0a; }
+        .scrollbar::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .scrollbar::-webkit-scrollbar-thumb:hover { background: #ef4444; }
+    </style>
+</head>
+<body class="min-h-screen flex">
+    <!-- Sidebar -->
+    <div class="w-64 border-r border-zinc-900 bg-zinc-950 flex flex-col">
+        <div class="p-6 border-b border-zinc-900">
+            <h1 class="text-xl font-black tracking-tighter text-white">PREDATOR <span class="text-red-600">v1</span></h1>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto scrollbar">
+            <a href="/" class="block p-3 rounded-lg text-xs font-bold uppercase tracking-widest bg-red-900/20 text-red-500 border border-red-900/30 transition-all">Dashboard</a>
+            <div class="pt-4 pb-2 text-[10px] font-bold text-zinc-700 uppercase tracking-widest px-3">Available Modules</div>
+            {% for key, a in attacks.items() %}
+            <a href="/attack/{{ key }}" class="block p-3 rounded-lg text-xs font-bold uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-900 transition-all">
+                {{ a.name }}
+            </a>
+            {% endfor %}
+        </nav>
+    </div>
+
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-zinc-900 bg-zinc-950/50 flex items-center justify-between px-8">
+            <div class="flex items-center gap-3">
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                <h2 class="text-sm font-bold uppercase tracking-widest text-white">Global Command Dashboard <span class="text-zinc-600 ml-2">/ Status: Online</span></h2>
+            </div>
+            <div class="text-[10px] font-bold text-zinc-600 uppercase tracking-[0.3em]">Predator Defensive Counter-Measure Suite</div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 scrollbar">
+            <div class="max-w-6xl mx-auto space-y-12">
+                <!-- Welcome Section -->
+                <section>
+                    <div class="glass p-12 rounded-3xl neon-border relative overflow-hidden">
+                        <div class="absolute -top-24 -right-24 w-64 h-64 bg-red-600/10 blur-[100px]"></div>
+                        <h1 class="text-5xl font-black tracking-tighter text-white mb-4">WELCOME, <span class="text-red-600 text-opacity-80">OPERATOR</span></h1>
+                        <p class="text-zinc-400 text-sm max-w-2xl leading-relaxed">
+                            The Predator System is an advanced offensive simulation suite designed to test and harden the Hybrid IDPS. Use the modules in the sidebar or the quick links below to launch targeted attack sequences and monitor the detection efficacy in real-time.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Quick Links Grid -->
+                <section>
+                    <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-4">
+                        <span class="h-px flex-1 bg-zinc-900"></span>
+                        Quick Attack Launch
+                        <span class="h-px flex-1 bg-zinc-900"></span>
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {% for key, a in attacks.items() %}
+                        <a href="/attack/{{ key }}" class="glass p-6 rounded-2xl hover:border-red-500 transition-all group relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                </svg>
+                            </div>
+                            <h4 class="text-sm font-black text-white uppercase mb-2">{{ a.name }}</h4>
+                            <p class="text-[10px] text-zinc-600 leading-normal uppercase">{{ a.desc }}</p>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <!-- Detailed Descriptions -->
+                <section class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="space-y-6 text-zinc-500">
+                        <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-2 px-6">System Capabilities</h3>
+                        <div class="space-y-1">
+                            <div class="p-6 glass rounded-2xl">
+                                <h5 class="text-xs font-bold text-red-500 uppercase mb-2">Protocol Simulation</h5>
+                                <p class="text-[11px] leading-relaxed">Highly realistic TCP/UDP packet construction matching CICIDS2017 dataset benchmarks.</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl">
+                                <h5 class="text-xs font-bold text-red-500 uppercase mb-2">Real-time Telemetry</h5>
+                                <p class="text-[11px] leading-relaxed">Continuous pps feedback and forensic log streaming via SocketIO integration.</p>
+                            </div>
+                            <div class="p-6 glass rounded-2xl">
+                                <h5 class="text-xs font-bold text-red-500 uppercase mb-2">Variable Intensity</h5>
+                                <p class="text-[11px] leading-relaxed">Tunable attack cadence from stealthy single probes to aggressive flood sequences.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6">
+                        <h3 class="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em] mb-2 px-6">Acknowledgements</h3>
+                        <div class="glass p-8 rounded-3xl border-l-4 border-l-red-600 h-full">
+                            <div class="space-y-4">
+                                <div>
+                                    <h5 class="text-xs font-bold text-white uppercase mb-1">UNB CICIDS2017</h5>
+                                    <p class="text-[10px] text-zinc-600 capitalize">Special thanks to the Canadian Institute for Cybersecurity for providing the benchmark datasets.</p>
+                                </div>
+                                <div>
+                                    <h5 class="text-xs font-bold text-white uppercase mb-1">Core Contributors</h5>
+                                    <p class="text-[10px] text-zinc-600 capitalize">Developed as part of the advanced network security research project. ACK: Lead Researcher & AI Assistant.</p>
+                                </div>
+                                <div>
+                                    <h5 class="text-xs font-bold text-white uppercase mb-1">System Version</h5>
+                                    <p class="text-[10px] text-red-900 font-mono italic">Build: 2024.MAR.OFFENSIVE_BETA</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                
+                <footer class="pb-12 text-center">
+                    <p class="text-[9px] text-zinc-800 font-mono tracking-[0.5em] uppercase">Authorized personnel only _ System is being monitored</p>
+                </footer>
+            </div>
+        </main>
+    </div>
+</body>
+</html>
